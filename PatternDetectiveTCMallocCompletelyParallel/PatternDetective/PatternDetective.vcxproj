@@ -20,24 +20,36 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\Dirent.cpp" />
+    <ClCompile Include="..\..\BaseCodeCompletelyParallel\DRAMProcessor.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\FileReader.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\Forest.cpp" />
+    <ClCompile Include="..\..\BaseCodeCompletelyParallel\HardDiskProcessor.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\Logger.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\main.cpp" />
+    <ClCompile Include="..\..\BaseCodeCompletelyParallel\MemoryWatchDog.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\mman.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\PListArchive.cpp" />
+    <ClCompile Include="..\..\BaseCodeCompletelyParallel\Processor.cpp" />
+    <ClCompile Include="..\..\BaseCodeCompletelyParallel\ProcessorConfig.cpp" />
+    <ClCompile Include="..\..\BaseCodeCompletelyParallel\ProcessorStats.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\StopWatch.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\TreeHD.cpp" />
     <ClCompile Include="..\..\BaseCodeCompletelyParallel\TreeRAM.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\Dirent.h" />
+    <ClInclude Include="..\..\BaseCodeCompletelyParallel\DRAMProcessor.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\FileReader.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\Forest.h" />
+    <ClInclude Include="..\..\BaseCodeCompletelyParallel\HardDiskProcessor.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\Logger.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\MemoryUtils.h" />
+    <ClInclude Include="..\..\BaseCodeCompletelyParallel\MemoryWatchDog.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\mman.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\PListArchive.h" />
+    <ClInclude Include="..\..\BaseCodeCompletelyParallel\Processor.h" />
+    <ClInclude Include="..\..\BaseCodeCompletelyParallel\ProcessorConfig.h" />
+    <ClInclude Include="..\..\BaseCodeCompletelyParallel\ProcessorStats.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\StopWatch.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\TreeHD.h" />
     <ClInclude Include="..\..\BaseCodeCompletelyParallel\TreeRAM.h" />
@@ -90,7 +102,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>PatternFinder</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>PatternFinder</TargetName>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>

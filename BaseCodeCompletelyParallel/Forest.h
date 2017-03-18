@@ -13,6 +13,10 @@
 #include "StopWatch.h"
 #include <array>
 #include <queue>
+#include "DRAMProcessor.h"
+#include "HardDiskProcessor.h"
+#include "ProcessorStats.h"
+#include "MemoryWatchDog.h"
 #if defined(_WIN64) || defined(_WIN32)
 #include "Dirent.h"
 #elif defined(__linux__)
@@ -36,74 +40,81 @@ typedef std::vector<map<PatternType, PListType>>::iterator it_type;
 typedef std::map<PatternType, vector<PListType>*>::iterator it_map_list_p_type;
 typedef std::map<unsigned int, unsigned int>::iterator it_chunk;
 
-struct LevelPackage
-{
-	unsigned int currLevel;
-	unsigned int threadIndex;
-	unsigned int inceptionLevelLOL;
-	bool useRAM;
-	unsigned int coreIndex;
-};
+//struct LevelPackage
+//{
+//	unsigned int currLevel;
+//	unsigned int threadIndex;
+//	unsigned int inceptionLevelLOL;
+//	bool useRAM;
+//	unsigned int coreIndex;
+//};
 
 class Forest
 {
 
 private:
-	PListType memoryCeiling;
-	double mostMemoryOverflow;
-	double currMemoryOverflow;
+
+	DRAMProcessor<PListType>* dramProc;
+	
+	ProcessorConfig procData;
+
+	MemoryWatchDog* watchDog;
+
+
+	//PListType memoryCeiling;
+	//double mostMemoryOverflow;
+	//double currMemoryOverflow;
 	PListType fileID;
 	vector<mutex*> gatedMutexes;
-	vector<unsigned int> currentLevelVector;
+	//vector<unsigned int> currentLevelVector;
 	vector<bool> activeThreads;
 	int threadsDispatched;
 	int threadsDefuncted;
 	vector<future<void>> *threadPool;
 	vector<future<void>> *threadPlantSeedPoolHD;
-	vector<future<void>> *threadPlantSeedPoolRAM;
-	vector<FileReader*> files;
+	//vector<future<void>> *threadPlantSeedPoolRAM;
+	//vector<FileReader*> files;
 	std::string::size_type sz;
-	unsigned int numThreads;
-	unsigned int levelToOutput;
-	int history;
-	PListType minimum, maximum;
-	PListType memoryBandwidthMB;
-	PListType memoryPerThread;
-	unsigned int globalLevel;
-	string patternToSearchFor;
+	//unsigned int ProcessorConfig::numThreads;
+	//unsigned int levelToOutput;
+	//int history;
+	//PListType minimum, maximum;
+	//PListType memoryBandwidthMB;
+	//PListType memoryPerThread;
+	//unsigned int globalLevel;
+	//string patternToSearchFor;
 	//If /d is in commands then display number of patterns found at each level
-	bool displayEachLevelSearch;
+	//bool displayEachLevelSearch;
 	//If /c is in commands then cycle from 1 thread to MAX threads on machine and output best thread scheme
-	bool findBestThreadNumber;
-	mutex *countMutex;
-	mutex *fileIDMutex;
-	bool usingMemoryBandwidth;
-	unsigned int testIterations;
-	bool usingPureRAM;
-	bool usingPureHD;
+	//bool findBestThreadNumber;
+
+	//bool usingMemoryBandwidth;
+	//unsigned int testIterations;
+	//bool usingPureRAM;
+	//bool usingPureHD;
 	vector<vector<string>> prevFileNameList;
 	vector<vector<string>> newFileNameList;
 	queue<string> filesToBeRemoved;
 	mutex filesToBeRemovedLock;
-	double MemoryUsedPriorToThread;
-	double MemoryUsageAtInception;
+	//double MemoryUsedPriorToThread;
+	//double MemoryUsageAtInception;
 	vector<bool> usedRAM;
-	vector<vector<PListType>*>* prevPListArray;
-	vector<vector<PListType>*>* globalPListArray;
-	PListType eradicatedPatterns;
-	vector<PListType> levelRecordings;
+	//vector<vector<PListType>*>* prevPListArray;
+	//vector<vector<PListType>*>* globalPListArray;
+	//PListType eradicatedPatterns;
+	//vector<PListType> levelRecordings;
 	vector<PListType> mostCommonPatternCount;
 	vector<PListType> mostCommonPatternIndex;
 	StopWatch initTime;
 	bool processingFinished;
 	bool processingMSYNCFinished;
-	PListType minOccurrence;
+	//PListType minOccurrence;
 	bool writingFlag;
 	vector<float> coverage;
 	map<unsigned int, unsigned int> chunkIndexToFileChunk;
 	vector<string> fileChunks;
 	vector<double> statisticsModel;
-	int f;
+	//int f;
 	vector<PListType> fileSizes;
 	vector<double> processingTimes;
 	map<PListType, PListType> finalPattern;

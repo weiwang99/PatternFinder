@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "TypeDefines.h"
+#include <thread>
 using namespace std;
 
 static bool init = false;
