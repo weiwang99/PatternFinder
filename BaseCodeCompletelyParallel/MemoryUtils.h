@@ -83,9 +83,9 @@ public:
 
 	}
 
-	static PListType parseLine(char* line)
+	static size_t parseLine(char* line)
 	{
-		PListType i = strlen(line);
+		size_t i = strlen(line);
 		while (*line < '0' || *line > '9') line++;
 		line[i-3] = '\0';
 		i = atoi(line);
@@ -99,7 +99,7 @@ public:
 		
 		PROCESS_MEMORY_COUNTERS pmc;
 		GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
-		PListType physMemUsedByMe = pmc.WorkingSetSize;
+		size_t physMemUsedByMe = pmc.WorkingSetSize;
 		return physMemUsedByMe/1000000.0f;
 
 #elif defined(__linux__)
@@ -159,7 +159,7 @@ public:
 		}
 
 		ULARGE_INTEGER now, sys, user;
-		double percent;
+		ULONGLONG percent;
 
 		GetSystemTimeAsFileTime(&ftime);
 		memcpy(&now, &ftime, sizeof(FILETIME));

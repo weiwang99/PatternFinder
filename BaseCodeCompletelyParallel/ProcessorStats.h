@@ -13,8 +13,6 @@ public:
 
 	static unsigned int globalLevel;
 	static mutex *countMutex;
-	static mutex *fileIDMutex;
-	static PListType fileID;
 	static PListType eradicatedPatterns;
 	static bool processingFinished;
 	static bool overMemoryCount;
@@ -35,5 +33,6 @@ public:
 
 	static int threadsDispatched;
 	static int threadsDefuncted;
+	static bool firstLevelProcessedHD;
 };
 

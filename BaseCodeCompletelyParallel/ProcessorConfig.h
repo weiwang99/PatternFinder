@@ -13,7 +13,7 @@ public:
 	static void FindFiles(string directory);
 	static void DisplayHelpMessage();
 
-	static unsigned int ProcessorConfig::numThreads;
+	static unsigned int numThreads;
 	static vector<FileReader*> files;
 	static int f;
 	static string patternToSearchFor;

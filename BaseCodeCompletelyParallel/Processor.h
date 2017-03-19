@@ -7,27 +7,16 @@
 
 using namespace std;
 
-//Struct used to pass around current level data
-struct LevelPackage
-{
-	unsigned int currLevel;
-	unsigned int threadIndex;
-	unsigned int inceptionLevelLOL;
-	bool useRAM;
-	unsigned int coreIndex;
-};
-
-
 template<class DataType>
 class Processor
 {
 public:
 	Processor<DataType>(void){};
-	~Processor<DataType>(void){};
+	virtual ~Processor<DataType>(void){};
 
 	virtual void PlantSeed(DataType positionInFile, DataType startPatternIndex, DataType numPatternsToSearch, DataType threadIndex) = 0;
 	
-	void WaitForThreads(vector<unsigned int> localWorkingThreads, vector<future<void>> *localThreadPool, bool recursive = false, unsigned int level = 0)
+	void WaitForThreads(vector<unsigned int> localWorkingThreads, vector<future<bool>> *localThreadPool, bool recursive = false, unsigned int level = 0)
 	{
 		DataType threadsFinished = 0;
 		StopWatch oneSecondTimer;
@@ -40,7 +29,10 @@ public:
 				{
 					if(recursive)
 					{
-						(*localThreadPool)[localWorkingThreads[k]].get();
+						if((*localThreadPool)[localWorkingThreads[k]].get())
+						{
+
+						}
 
 						threadsFinished++;
 					}

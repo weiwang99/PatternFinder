@@ -17,6 +17,7 @@
 #include "HardDiskProcessor.h"
 #include "ProcessorStats.h"
 #include "MemoryWatchDog.h"
+#include "ProcessorManager.h"
 #if defined(_WIN64) || defined(_WIN32)
 #include "Dirent.h"
 #elif defined(__linux__)
@@ -53,12 +54,11 @@ class Forest
 {
 
 private:
-
-	DRAMProcessor<PListType>* dramProc;
-	
 	ProcessorConfig procData;
 
 	MemoryWatchDog* watchDog;
+
+	ProcessorManager* procMan;
 
 
 	//PListType memoryCeiling;
@@ -67,7 +67,7 @@ private:
 	PListType fileID;
 	vector<mutex*> gatedMutexes;
 	//vector<unsigned int> currentLevelVector;
-	vector<bool> activeThreads;
+	//vector<bool> activeThreads;
 	int threadsDispatched;
 	int threadsDefuncted;
 	vector<future<void>> *threadPool;
@@ -98,13 +98,13 @@ private:
 	mutex filesToBeRemovedLock;
 	//double MemoryUsedPriorToThread;
 	//double MemoryUsageAtInception;
-	vector<bool> usedRAM;
+	//vector<bool> usedRAM;
 	//vector<vector<PListType>*>* prevPListArray;
 	//vector<vector<PListType>*>* globalPListArray;
 	//PListType eradicatedPatterns;
 	//vector<PListType> levelRecordings;
-	vector<PListType> mostCommonPatternCount;
-	vector<PListType> mostCommonPatternIndex;
+	//vector<PListType> mostCommonPatternCount;
+	//vector<PListType> mostCommonPatternIndex;
 	StopWatch initTime;
 	bool processingFinished;
 	bool processingMSYNCFinished;
@@ -118,7 +118,7 @@ private:
 	vector<PListType> fileSizes;
 	vector<double> processingTimes;
 	map<PListType, PListType> finalPattern;
-	bool firstLevelProcessedHD;
+	//bool firstLevelProcessedHD;
 
 	void FindFiles(string directory);
 	void MemoryQuery();

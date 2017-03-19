@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 
 using namespace std;
+
+
+
 #define ARCHIVE_FOLDER LOGGERPATH
 #if defined(_WIN64) || defined(_WIN32)
 	#define READMEPATH "../../ReadMe.txt"
@@ -31,3 +34,13 @@ typedef unsigned long long PatternType;
 #if BYTES
 typedef string PatternType;
 #endif
+
+//Struct used to pass around current level data
+struct LevelPackage
+{
+	unsigned int currLevel;
+	unsigned int threadIndex;
+	unsigned int inceptionLevelLOL;
+	bool useRAM;
+	unsigned int coreIndex;
+};

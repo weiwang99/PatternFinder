@@ -2,7 +2,6 @@
 #include "MemoryUtils.h"
 
 mutex* ProcessorStats::countMutex = new mutex();
-mutex* ProcessorStats::fileIDMutex = new mutex();
 unsigned int ProcessorStats::globalLevel = 0;
 vector<PListType> ProcessorStats::levelRecordings;
 vector<PListType> ProcessorStats::currentLevelVector;
@@ -20,7 +19,7 @@ vector<bool> ProcessorStats::activeThreads;
 vector<bool> ProcessorStats::usedRAM;
 int ProcessorStats::threadsDispatched = 0;
 int ProcessorStats::threadsDefuncted = 0;
-PListType ProcessorStats::fileID = 0;
+bool ProcessorStats::firstLevelProcessedHD = false;
 
 ProcessorStats::ProcessorStats(void)
 {

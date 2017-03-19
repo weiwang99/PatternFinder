@@ -5,11 +5,11 @@ template<class DataType>
 class DRAMProcessor : Processor<DataType>
 {
 public:
-	DRAMProcessor<DataType>(void)
+	DRAMProcessor(void)
 	{
 		int threadsToDispatch = ProcessorConfig::numThreads - 1;
 		prevPListArray = new vector<vector<DataType>*>();
-		globalPListArray = new vector<vector<DataType>*>();
+		nextPListArray = new vector<vector<DataType>*>();
 
 		//Initialize all possible values for the first list to NULL
 		prevPListArray->resize(256*threadsToDispatch);
@@ -18,17 +18,17 @@ public:
 			(*prevPListArray)[i] = NULL;
 		}
 	}
-	~DRAMProcessor<DataType>(void)
+	~DRAMProcessor(void)
 	{
 		Cleanup();
 
 		delete prevPListArray;
-		delete globalPListArray;
+		delete nextPListArray;
 	}
 
 	void Cleanup()
 	{
-		for (int i = 0; i < prevPListArray->size(); i++)
+		/*for (int i = 0; i < prevPListArray->size(); i++)
 		{
 			if((*prevPListArray)[i] != NULL)
 			{
@@ -37,14 +37,14 @@ public:
 		}
 		prevPListArray->clear();
 
-		for (int i = 0; i < globalPListArray->size(); i++)
+		for (int i = 0; i < nextPListArray->size(); i++)
 		{
-			if((*globalPListArray)[i] != NULL)
+			if((*nextPListArray)[i] != NULL)
 			{
-				delete (*globalPListArray)[i];
+				delete (*nextPListArray)[i];
 			}
-		}
-		globalPListArray->clear();
+		}*/
+		nextPListArray->clear();
 	}
 
 	vector<vector<PListType>> BalanceLoad(int threadsToDispatch, vector<vector<PListType>*>* patterns)
@@ -157,11 +157,108 @@ public:
 		return balancedTruncList;
 	}
 
-	void ThreadBranch(vector<vector<PListType>*>* patterns, vector<PListType> patternIndexList, vector<string> fileList, LevelPackage levelInfo)
+	void WaitForThreads(vector<unsigned int> localWorkingThreads, vector<future<vector<vector<PListType>*>*>> *localThreadPool, bool recursive = false, unsigned int level = 0)
+	{
+		DataType threadsFinished = 0;
+		StopWatch oneSecondTimer;
+		while (threadsFinished != localThreadPool->size())
+		{
+			vector<unsigned int> currentThreads;
+			for (DataType k = 0; k < localWorkingThreads.size(); k++)
+			{
+				if (localThreadPool != NULL && (*localThreadPool)[localWorkingThreads[k]].valid())
+				{
+					if(recursive)
+					{
+						vector<vector<PListType>*>* newBatch = (*localThreadPool)[localWorkingThreads[k]].get();
+
+						threadsFinished++;
+					}
+					else
+					{
+						vector<vector<PListType>*>* newBatch = (*localThreadPool)[localWorkingThreads[k]].get();
+						
+						threadsFinished++;
+
+						ProcessorStats::countMutex->lock();
+						ProcessorStats::activeThreads[k] = false;
+						ProcessorStats::countMutex->unlock();
+
+						if(level != 0)
+						{
+							stringstream buff;
+							buff << "Thread " << localWorkingThreads[k] << " finished all processing" << endl;
+							Logger::WriteLog(buff.str());
+						}
+					}
+				}
+				else
+				{
+					//std::this_thread::sleep_for(std::chrono::milliseconds(1));
+					currentThreads.push_back(localWorkingThreads[k]);
+				}
+			}
+			localWorkingThreads.clear();
+			for(unsigned int i = 0; i < currentThreads.size(); i++)
+			{
+				localWorkingThreads.push_back(currentThreads[i]);
+			}
+		}
+	}
+
+	void WaitForFirstLevelThreads(vector<unsigned int> localWorkingThreads, vector<future<void>> *localThreadPool, bool recursive = false, unsigned int level = 0)
+	{
+		DataType threadsFinished = 0;
+		StopWatch oneSecondTimer;
+		while (threadsFinished != localThreadPool->size())
+		{
+			vector<unsigned int> currentThreads;
+			for (DataType k = 0; k < localWorkingThreads.size(); k++)
+			{
+				if (localThreadPool != NULL && (*localThreadPool)[localWorkingThreads[k]].valid())
+				{
+					if(recursive)
+					{
+						(*localThreadPool)[localWorkingThreads[k]].get();
+
+						threadsFinished++;
+					}
+					else
+					{
+						(*localThreadPool)[localWorkingThreads[k]].get();
+						
+						threadsFinished++;
+
+						ProcessorStats::countMutex->lock();
+						ProcessorStats::activeThreads[k] = false;
+						ProcessorStats::countMutex->unlock();
+
+						if(level != 0)
+						{
+							stringstream buff;
+							buff << "Thread " << localWorkingThreads[k] << " finished all processing" << endl;
+							Logger::WriteLog(buff.str());
+						}
+					}
+				}
+				else
+				{
+					//std::this_thread::sleep_for(std::chrono::milliseconds(1));
+					currentThreads.push_back(localWorkingThreads[k]);
+				}
+			}
+			localWorkingThreads.clear();
+			for(unsigned int i = 0; i < currentThreads.size(); i++)
+			{
+				localWorkingThreads.push_back(currentThreads[i]);
+			}
+		}
+	}
+
+	vector<vector<PListType>*>* ThreadBranch(vector<vector<PListType>*>* patterns, vector<PListType> patternIndexList, LevelPackage levelInfo)
 	{
 		PListType numPatternsToSearch = patternIndexList.size();
 		bool isThreadDefuncted = false;
-		//cout << "Threads dispatched: " << threadsDispatched << " Threads deported: " << threadsDefuncted << " Threads running: " << threadsDispatched - threadsDefuncted << endl;
 
 		int tempCurrentLevel = levelInfo.currLevel;
 		int threadsToDispatch = ProcessorConfig::numThreads - 1;
@@ -172,52 +269,35 @@ public:
 		}
 
 		vector<vector<PListType>*>* prevLocalPListArray = new vector<vector<PListType>*>();
-		vector<vector<PListType>*>*	globalLocalPListArray = new vector<vector<PListType>*>();
+		vector<vector<PListType>*>*	nextLocalPListArray = new vector<vector<PListType>*>();
 
-		if(levelInfo.useRAM)
+		for(PListType i = 0; i < numPatternsToSearch; i++)
 		{
-			for(PListType i = 0; i < numPatternsToSearch; i++)
+			if((*patterns)[patternIndexList[i]] != NULL)
 			{
-				if((*patterns)[patternIndexList[i]] != NULL)
-				{
-					prevLocalPListArray->push_back((*patterns)[patternIndexList[i]]);
-				}
+				prevLocalPListArray->push_back((*patterns)[patternIndexList[i]]);
 			}
 		}
 
-		bool continueSearching = true;
+		continueSearching = Process(prevLocalPListArray,  nextLocalPListArray, levelInfo, isThreadDefuncted);
 
-		while(continueSearching)
+		//Set patterns to the previous level's pLists to transition from ram to hd processing
+		if(!continueSearching)
 		{
-			bool useRAMBRO = true;
-			if(levelInfo.currLevel != 2)
+			if(prevLocalPListArray != NULL)
 			{
-				//useRAMBRO = !NextLevelTreeSearchRecursion(prevLocalPListArray, globalLocalPListArray, fileList, levelInfo);
-			}
-			else
-			{
-				useRAMBRO = levelInfo.useRAM;
+				delete prevLocalPListArray;
 			}
 
-			if(useRAMBRO)
+			if(nextLocalPListArray != NULL)
 			{
-				continueSearching = Process(prevLocalPListArray, globalLocalPListArray, levelInfo, isThreadDefuncted);
+				delete nextLocalPListArray;
 			}
-			else
-			{
-				//continueSearching = ProcessHD(levelInfo, fileList, isThreadDefuncted);
-			}
+			prevLocalPListArray = NULL;
+			nextLocalPListArray = NULL;
 		}
-
-		if(prevLocalPListArray != NULL)
-		{
-			delete prevLocalPListArray;
-		}
-
-		if(globalLocalPListArray != NULL)
-		{
-			delete globalLocalPListArray;
-		}
+			
+		
 
 		ProcessorStats::countMutex->lock();
 		if(ProcessorStats::currentLevelVector[levelInfo.threadIndex] > ProcessorStats::globalLevel)
@@ -230,45 +310,45 @@ public:
 		}
 		ProcessorStats::countMutex->unlock();
 
-		return;
+		return prevLocalPListArray;
 	}
 
-	void BuildThreadJobs(DataType level)
+	vector<vector<DataType>*>* BuildThreadJobs(LevelPackage &levelData)
 	{
-		vector<future<void>> *threadPool = new vector<future<void>>();
-		//use that one prediction
-		if(ProcessorStats::usedRAM[0])
+		vector<future<vector<vector<PListType>*>* >> *threadPool = new vector<future<vector<vector<PListType>*>* >>();
+
+		int level = levelData.currLevel;
+		
+		vector<vector<PListType>> balancedTruncList = BalanceLoad(ProcessorConfig::numThreads - 1, prevPListArray);
+		vector<unsigned int> localWorkingThreads;
+		for(unsigned int i = 0; i < balancedTruncList.size(); i++)
 		{
-			vector<vector<PListType>> balancedTruncList = BalanceLoad(ProcessorConfig::numThreads - 1, prevPListArray);
-			vector<unsigned int> localWorkingThreads;
-			for(unsigned int i = 0; i < balancedTruncList.size(); i++)
-			{
-				ProcessorStats::activeThreads[i] = true;
-				localWorkingThreads.push_back(i);
-			}
-
-			ProcessorStats::countMutex->lock();
-			for (unsigned int i = 0; i < localWorkingThreads.size(); i++)
-			{
-				LevelPackage levelInfo;
-				levelInfo.currLevel = level;
-				levelInfo.threadIndex = i;
-				levelInfo.inceptionLevelLOL = 0;
-				levelInfo.useRAM = true;
-				levelInfo.coreIndex = i;
-				ProcessorStats::threadsDispatched++;
-				vector<string> temp2;
-
-				threadPool->push_back(std::async(std::launch::async, &DRAMProcessor::ThreadBranch, this, prevPListArray, balancedTruncList[i], temp2, levelInfo));
-	
-			}
-			ProcessorStats::countMutex->unlock();
-
-			Processor<DataType>::WaitForThreads(localWorkingThreads, threadPool);
+			ProcessorStats::activeThreads[i] = true;
+			localWorkingThreads.push_back(i);
 		}
+
+		ProcessorStats::countMutex->lock();
+		for (unsigned int i = 0; i < localWorkingThreads.size(); i++)
+		{
+			LevelPackage levelInfo;
+			levelInfo.currLevel = level;
+			levelInfo.threadIndex = i;
+			levelInfo.inceptionLevelLOL = 0;
+			levelInfo.useRAM = true;
+			levelInfo.coreIndex = i;
+			ProcessorStats::threadsDispatched++;
+
+			threadPool->push_back(std::async(std::launch::async, &DRAMProcessor::ThreadBranch, this, prevPListArray, balancedTruncList[i], levelInfo));
+	
+		}
+		ProcessorStats::countMutex->unlock();
+
+		WaitForThreads(localWorkingThreads, threadPool);
+
+		return prevPListArray;
 	}
 
-	bool Process(vector<vector<DataType>*>* prevLocalPListArray, vector<vector<DataType>*>* globalLocalPListArray, LevelPackage& levelInfo, bool& isThreadDefuncted)
+	bool Process(vector<vector<DataType>*>* prevLocalPListArray, vector<vector<DataType>*>* nextLocalPListArray, LevelPackage& levelInfo, bool& isThreadDefuncted)
 	{
 		//Keeps track of all pLists in one contiguous block of memory
 		vector<PListType> linearList;
@@ -316,7 +396,7 @@ public:
 					delete (*prevLocalPListArray)[i];
 				}
 
-				if(/*!firstLevelProcessedHD*/false)
+				if(!ProcessorStats::firstLevelProcessedHD)
 				{
 					if(i % threadsToDispatch == (threadsToDispatch - 1) && threadCountage > 1)
 					{
@@ -330,7 +410,6 @@ public:
 					threadCountage = 0;
 				}
 			}
-			//delete prevLocalPListArray;
 		}
 		else
 		{
@@ -359,9 +438,7 @@ public:
 				{
 					delete (*prevLocalPListArray)[i];
 				}
-				//delete (*prevLocalPListArray)[i];
 			}
-			//delete prevLocalPListArray;
 		}
 		globalStringConstruct.resize(totalCount);
 		linearList.reserve(totalCount);
@@ -649,7 +726,7 @@ public:
 			else
 			{
 				//Have to add prediction here 
-				bool prediction = false;//PredictHardDiskOrRAMProcessing(levelInfo, ProcessorStats::levelRecordings[levelInfo.currLevel - 2]);
+				bool prediction = ProcessorManager::PredictHardDiskOrRAMProcessing(levelInfo, ProcessorStats::levelRecordings[levelInfo.currLevel - 2]);
 				if(prediction)
 				{
 
@@ -671,7 +748,7 @@ public:
 				{
 					continueSearching = true;
 				
-					//DispatchNewThreadsRAM(0, continueSearching, linearList, pListLengths, levelInfo, isThreadDefuncted);
+					DispatchNewThreads(0, continueSearching, linearList, pListLengths, levelInfo, isThreadDefuncted);
 
 					prevLinearList.clear();
 					prevLinearList.reserve(linearList.size());
@@ -686,6 +763,124 @@ public:
 			}
 		}
 		return continueSearching;
+	}
+
+	bool DispatchNewThreads(PListType newPatternCount, bool& morePatternsToFind, vector<PListType> &linearList, vector<PListType> &pListLengths, LevelPackage levelInfo, bool& isThreadDefuncted)
+	{
+		bool dispatchedNewThreads = false;
+		bool alreadyUnlocked = false;
+		ProcessorStats::countMutex->lock();
+
+		int threadsToDispatch = ProcessorConfig::numThreads - 1;
+		int unusedCores = (threadsToDispatch - (ProcessorStats::threadsDispatched - ProcessorStats::threadsDefuncted)) + 1;
+	
+		if(pListLengths.size() < unusedCores && unusedCores > 1)
+		{
+			unusedCores = (int)pListLengths.size();
+		}
+		//Be conservative with thread allocation
+		//Only create new thread for work if the new job will have atleast 10 patterns
+		//Stack overflow can occur if there are too many little jobs being assigned
+		//Need to have an available core, need to still have patterns to search and need to have more than 1 pattern to be worth splitting up the work
+		if(unusedCores > 1 && morePatternsToFind && pListLengths.size()/unusedCores > 10)
+		{
+		
+			bool spawnThreads = true;
+			//If this thread is at the lowest level of progress spawn new threads
+			if(spawnThreads)
+			{
+				//cout << "PList size: " << linearList.size() << " with " << pListLengths.size() << " pattern nodes!" << endl;
+				vector<vector<PListType>*>* prevLocalPListArray = new vector<vector<PListType>*>();
+				PListType indexing = 0;
+				for(int piss = 0; piss < pListLengths.size(); piss++)
+				{
+					prevLocalPListArray->push_back(new vector<PListType>(linearList.begin() + indexing, linearList.begin() + indexing + pListLengths[piss]));
+					indexing += pListLengths[piss];
+				}
+
+				linearList.clear();
+				linearList.reserve(0);
+				pListLengths.clear();
+				pListLengths.reserve(0);
+
+				vector<vector<PListType>> balancedTruncList = BalanceLoad(unusedCores, prevLocalPListArray);
+				vector<unsigned int> localWorkingThreads;
+				for(unsigned int i = 0; i < balancedTruncList.size(); i++)
+				{
+					localWorkingThreads.push_back(i);
+				}
+
+				if(localWorkingThreads.size() > 1)
+				{
+					int threadsToTest = (ProcessorStats::threadsDispatched - ProcessorStats::threadsDefuncted) - 1;
+					if(threadsToTest + localWorkingThreads.size() <= threadsToDispatch)
+					{
+
+						for(int z = 0; z < balancedTruncList.size(); z++)
+						{
+							unsigned int tally = 0;
+							for(int d = 0; d < balancedTruncList[z].size(); d++)
+							{
+								tally += (unsigned int)(*prevLocalPListArray)[balancedTruncList[z][d]]->size();
+							}
+						}
+
+						dispatchedNewThreads = true;
+
+						LevelPackage levelInfoRecursion;
+						levelInfoRecursion.currLevel = levelInfo.currLevel;
+						levelInfoRecursion.threadIndex = levelInfo.threadIndex;
+						levelInfoRecursion.inceptionLevelLOL = levelInfo.inceptionLevelLOL + 1;
+						levelInfoRecursion.useRAM = true;
+
+						ProcessorStats::threadsDefuncted++;
+						isThreadDefuncted = true;
+
+						vector<future<void>> *localThreadPool = new vector<future<void>>();
+						for (PListType i = 0; i < localWorkingThreads.size(); i++)
+						{
+							ProcessorStats::threadsDispatched++;
+							localThreadPool->push_back(std::async(std::launch::async, &DRAMProcessor::ThreadBranch, this, prevLocalPListArray, balancedTruncList[i], vector<string>(), levelInfoRecursion));
+						}
+						ProcessorStats::countMutex->unlock();
+
+						alreadyUnlocked = true;
+						WaitForThreads(localWorkingThreads, localThreadPool, true, levelInfo.threadIndex);
+
+						localThreadPool->erase(localThreadPool->begin(), localThreadPool->end());
+						(*localThreadPool).clear();
+						delete localThreadPool;
+						morePatternsToFind = false;
+						delete prevLocalPListArray;
+					}
+					else
+					{
+						for(int piss = 0; piss < prevLocalPListArray->size(); piss++)
+						{
+							delete (*prevLocalPListArray)[piss];
+						}
+						delete prevLocalPListArray;
+					}
+				}
+				else
+				{
+					for(int piss = 0; piss < prevLocalPListArray->size(); piss++)
+					{
+						delete (*prevLocalPListArray)[piss];
+					}
+					delete prevLocalPListArray;
+				}
+			}
+			else
+			{
+
+			}
+		}
+		if(!alreadyUnlocked)
+		{
+			ProcessorStats::countMutex->unlock();
+		}
+		return dispatchedNewThreads;
 	}
 
 	void PlantSeedProcessing(DataType patternCount, DataType overallFilePosition, LevelPackage &levelInfo)
@@ -716,7 +911,7 @@ public:
 			localWorkingThreads.push_back(i);
 		}
 
-		Processor<DataType>::WaitForThreads(localWorkingThreads, threadPlantSeedPool); 
+		WaitForThreads(localWorkingThreads, threadPlantSeedPool); 
 
 		PlantSeedPostProcessing(levelInfo);
 
@@ -810,155 +1005,11 @@ public:
 		ProcessorStats::currentLevelVector[threadIndex] = 2;
 	}
 
-	void DRAMProcessor::PostPlantDataPrep(bool prediction, vector<vector<string>>& fileList)
-	{
-		PListType threadsToDispatch = ProcessorConfig::numThreads - 1;
-		vector<vector<string>> tempFileList = fileList;
-		for(int a = 0; a < fileList.size(); a++)
-		{
-			fileList[a].clear();
-		}
-
-		if(prediction)
-		{
-			if(!ProcessorStats::usedRAM[0])
-			{
-				//chunk files
-				vector<PListArchive*> threadFiles;
-				stringstream threadFilesNames;
-				unsigned int threadNumber = 0;
-
-				for(int a = 0; a < tempFileList.size(); a++)
-				{
-					for(int b = 0; b < tempFileList[a].size(); b++)
-					{
-						fileList[threadNumber].push_back(tempFileList[a][b]);
-
-						//Increment chunk
-						threadNumber++;
-						if(threadNumber >= threadsToDispatch)
-						{
-							threadNumber = 0;
-						}
-					}
-				}
-			}
-			else if(ProcessorStats::usedRAM[0])
-			{
-				//chunk files
-				vector<PListArchive*> threadFiles;
-				stringstream threadFilesNames;
-				unsigned int threadNumber = 0;
-
-				for(int a = 0; a < threadsToDispatch; a++)
-				{
-					threadFilesNames.str("");
-					ProcessorStats::fileIDMutex->lock();
-					ProcessorStats::fileID++;
-					threadFilesNames << "PListChunks" << ProcessorStats::fileID;
-					ProcessorStats::fileIDMutex->unlock();
-
-					threadFiles.push_back(new PListArchive(threadFilesNames.str(), true));
-					fileList[a].push_back(threadFilesNames.str());
-				}
-				for(PListType prevIndex = 0; prevIndex < prevPListArray->size(); )
-				{
-					list<PListType> *sorting = new list<PListType>();
-
-					for(int threadCount = 0; threadCount < threadsToDispatch; threadCount++)
-					{
-						if((*prevPListArray)[prevIndex] != NULL)
-						{
-							copy( (*prevPListArray)[prevIndex]->begin(), (*prevPListArray)[prevIndex]->end(), std::back_inserter(*sorting));
-							((*prevPListArray)[prevIndex])->erase(((*prevPListArray)[prevIndex])->begin(), ((*prevPListArray)[prevIndex])->end());
-							delete (*prevPListArray)[prevIndex];
-							prevIndex++;
-						}
-					}
-					vector<PListType> finalVector;
-					sorting->sort();
-					std::copy( sorting->begin(), sorting->end(), std::back_inserter(finalVector));
-					sorting->clear();
-					delete sorting;
-
-					threadFiles[threadNumber]->WriteArchiveMapMMAP(finalVector);
-					threadFiles[threadNumber]->WriteArchiveMapMMAP(vector<PListType>(), "", true);
-				
-
-					//Increment chunk
-					threadNumber++;
-					if(threadNumber >= threadsToDispatch)
-					{
-						threadNumber = 0;
-					}
-				}
-				//Clear out the array also after deletion
-				prevPListArray->clear();
-
-				for(int a = 0; a < threadsToDispatch; a++)
-				{
-					threadFiles[a]->WriteArchiveMapMMAP(vector<PListType>(), "", true);
-					threadFiles[a]->CloseArchiveMMAP();
-					delete threadFiles[a];
-				}
-			}
-		}
-		else if(!prediction)
-		{
-			if(!ProcessorStats::usedRAM[0])
-			{
-				prevPListArray->clear();
-				for(PListType i = 0; i < tempFileList.size(); i++)
-				{
-					for(PListType prevChunkCount = 0; prevChunkCount < tempFileList[i].size(); prevChunkCount++)
-					{
-						PListArchive archive(tempFileList[i][prevChunkCount]);
-						while(archive.Exists() && !archive.IsEndOfFile())
-						{
-							//Just use 100 GB to say we want the whole file for now
-							vector<vector<PListType>*> packedPListArray;
-							archive.GetPListArchiveMMAP(packedPListArray);
-
-							prevPListArray->insert(prevPListArray->end(), packedPListArray.begin(), packedPListArray.end());
-
-							packedPListArray.erase(packedPListArray.begin(), packedPListArray.end());
-						}
-						archive.CloseArchiveMMAP();
-					}
-				}
-
-				for(PListType i = 0; i < threadsToDispatch; i++)
-				{
-					if(!ProcessorConfig::history)
-					{
-						//TODO -PJM
-						//DeleteArchives(tempFileList[i], ARCHIVE_FOLDER);
-					}
-				}
-				//Transition to using entire file when first level was hard disk processing and next level is pure ram
-				if(ProcessorConfig::files[ProcessorConfig::f]->fileString.size() != ProcessorConfig::files[ProcessorConfig::f]->fileStringSize)
-				{
-					//new way to read in file
-					ProcessorConfig::files[ProcessorConfig::f]->copyBuffer->seekg( 0 );
-					ProcessorConfig::files[ProcessorConfig::f]->fileString.resize(ProcessorConfig::files[ProcessorConfig::f]->fileStringSize);
-					ProcessorConfig::files[ProcessorConfig::f]->copyBuffer->read( &ProcessorConfig::files[ProcessorConfig::f]->fileString[0], ProcessorConfig::files[ProcessorConfig::f]->fileString.size());
-				}
-			}
-		}
-
-		for(int a = 0; a < ProcessorStats::usedRAM.size(); a++)
-		{
-			ProcessorStats::usedRAM[a] = !prediction;
-		}
-	}
-
-	bool DispatchNewThreads(DataType newPatternCount, bool& morePatternsToFind, vector<DataType> &linearList, vector<DataType> &pListLengths, LevelPackage levelInfo, bool& isThreadDefuncted);
-	void TreeSearch(vector<vector<DataType>*>* patterns, vector<DataType> patternIndexList, vector<string> fileList, LevelPackage levelInfo);
-	vector<vector<DataType>> ProcessThreadsWorkLoadRAM(unsigned int threadsToDispatch, vector<vector<DataType>*>* patterns);
-	vector<vector<DataType>> ProcessThreadsWorkLoadRAMFirstLevel(unsigned int threadsToDispatch, vector<vector<DataType>*>* patterns);
+	vector<vector<PListType>*>* GetPrevPList(){return prevPListArray;};
+	vector<vector<PListType>*>* GetNextPList(){return nextPListArray;};
 
 private:
 
 	vector<vector<DataType>*>* prevPListArray;
-	vector<vector<DataType>*>* globalPListArray;
+	vector<vector<DataType>*>* nextPListArray;
 };
